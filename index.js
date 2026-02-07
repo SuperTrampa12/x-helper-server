@@ -8,7 +8,9 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// ✅ CORS — ОДИН РАЗ
+/**
+ * ✅ CORS — ОДИН раз и правильно
+ */
 app.use(
   cors({
     origin: "*",
@@ -17,14 +19,21 @@ app.use(
   })
 );
 
+// обязательно
+app.options("*", cors());
+
 app.use(express.json());
 
-// health check
+/**
+ * Health check
+ */
 app.get("/", (req, res) => {
   res.send("X Helper server is alive");
 });
 
-// ✅ основной endpoint
+/**
+ * AI endpoint
+ */
 app.post("/generate", async (req, res) => {
   try {
     const { tweetText } = req.body;
@@ -41,7 +50,7 @@ app.post("/generate", async (req, res) => {
         {
           role: "system",
           content:
-            "You write short, natural, human-like replies to tweets. No emojis unless appropriate. Max 2 sentences.",
+            "You write short, natural, human-like replies to tweets. Max 2 sentences.",
         },
         {
           role: "user",
@@ -52,8 +61,7 @@ app.post("/generate", async (req, res) => {
       max_tokens: 120,
     });
 
-    const text =
-      completion.choices?.[0]?.message?.content?.trim();
+    const text = completion.choices?.[0]?.message?.content?.trim();
 
     if (!text) {
       return res.json({
@@ -65,11 +73,12 @@ app.post("/generate", async (req, res) => {
       replies: text
         .split("\n")
         .map((t) => t.trim())
-        .filter(Boolean),
+        .filter(Boolean)
+        .slice(0, 3),
     });
   } catch (err) {
     console.error("Generate error:", err);
-    res.json({
+    res.status(500).json({
       replies: ["(server error)"],
     });
   }
