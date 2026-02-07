@@ -29,14 +29,33 @@ app.post("/generate", async (req, res) => {
     }
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: "You write short, natural, human-like replies to tweets. Max 2 sentences." },
-        { role: "user", content: tweetText }
-      ],
-      temperature: 0.7,
-      max_tokens: 120,
-    });
+  model: "gpt-4o-mini",
+  messages: [
+    {
+      role: "system",
+      content: `
+You generate replies to tweets for X (Twitter).
+
+Rules:
+- Generate EXACTLY 3 different replies
+- Each reply must be ONE sentence
+- Replies must sound like real people on X
+- No motivational or inspirational tone
+- No explanations
+- No numbering
+- No emojis unless they feel very natural
+- Separate each reply with a new line
+`,
+    },
+    {
+      role: "user",
+      content: tweetText,
+    },
+  ],
+  temperature: 0.9,
+  max_tokens: 150,
+});
+
 
     const text = completion.choices?.[0]?.message?.content?.trim();
 
