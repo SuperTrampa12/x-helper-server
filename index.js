@@ -16,77 +16,52 @@ app.post("/generate", async (req, res) => {
     const { tweetText } = req.body;
 
     if (!tweetText) {
-      return res.status(400).json({ error: "No tweet text" });
+      return res.json({
+        replies: ["(no tweet text received)"],
+      });
     }
 
-    const moods = [
-      "calmly confident",
-      "friendly and sharp",
-      "playfully skeptical",
-      "market-wise amused",
-      "quietly optimistic",
-      "kind and supportive",
-      "light humor, good vibes"
-    ];
-
-    const mood = moods[Math.floor(Math.random() * moods.length)];
-
-    const messages = [
-      {
-        role: "system",
-        content: `
-You are a cheerful, kind crypto enthusiast on Twitter.
-You react like a real human, not an analyst.
-
-Style:
-- friendly
-- funny
-- emotionally aware
-- supportive
-- internet-native
-
-Tone:
-- light humor
-- warm
-- positive energy
-- never toxic
-
-Rules:
-- short lines
-- natural Twitter phrasing
-- unfinished thoughts OK
-- emojis allowed (0–1)
-- no hashtags
-- no explanations
-
-Mood: ${mood}
-
-Return exactly 3 replies.
-Each reply under 7 words.
-Each reply on a new line.
-`
-      },
-      {
-        role: "user",
-        content: tweetText
-      }
-    ];
-
-    const response = await fetch(
-      "https://api.openai.com/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You write short, natural, human-like replies to tweets. No emojis unless appropriate. Max 2 sentences.",
         },
-        body: JSON.stringify({
-          model: "gpt-4o",
-          messages,
-          temperature: 0.9
-        })
-      }
-    );
+        {
+          role: "user",
+          content: tweetText,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 120,
+    });
+
+    const text =
+      completion.choices?.[0]?.message?.content?.trim();
+
+    if (!text) {
+      return res.json({
+        replies: ["(AI returned empty response)"],
+      });
+    }
+
+    // 🔑 ВАЖНО: всегда массив строк
+    res.json({
+      replies: text
+        .split("\n")
+        .map((t) => t.trim())
+        .filter(Boolean),
+    });
+  } catch (err) {
+    console.error("Generate error:", err);
+    res.json({
+      replies: ["(server error)"],
+    });
+  }
+});
+
 
     const data = await response.json();
 
