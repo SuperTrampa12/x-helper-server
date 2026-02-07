@@ -1,16 +1,30 @@
 import express from "express";
 import cors from "cors";
-import fetch from "node-fetch";
+import OpenAI from "openai";
 
 const app = express();
 
-app.use(cors());
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+// ✅ CORS — ОДИН РАЗ
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type"],
+  })
+);
+
 app.use(express.json());
 
+// health check
 app.get("/", (req, res) => {
   res.send("X Helper server is alive");
 });
 
+// ✅ основной endpoint
 app.post("/generate", async (req, res) => {
   try {
     const { tweetText } = req.body;
@@ -47,7 +61,6 @@ app.post("/generate", async (req, res) => {
       });
     }
 
-    // 🔑 ВАЖНО: всегда массив строк
     res.json({
       replies: text
         .split("\n")
@@ -59,24 +72,6 @@ app.post("/generate", async (req, res) => {
     res.json({
       replies: ["(server error)"],
     });
-  }
-});
-
-
-    const data = await response.json();
-
-    const raw = data.choices?.[0]?.message?.content || "";
-    const replies = raw
-      .split("\n")
-      .map(s => s.trim())
-      .filter(Boolean)
-      .slice(0, 3);
-
-    res.json({ replies });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
   }
 });
 
