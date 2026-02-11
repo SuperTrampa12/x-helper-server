@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import OpenAI from "openai";
+import { examples } from "./examples.js";
 
 const app = express();
 
@@ -16,6 +17,11 @@ app.use(cors({
 
 app.use(express.json());
 
+function getRandomExamples(arr, count = 5) {
+  const shuffled = [...arr].sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, count);
+}
+
 app.get("/", (req, res) => {
   res.send("X Helper server is alive");
 });
@@ -28,77 +34,65 @@ app.post("/generate", async (req, res) => {
       return res.json({ replies: ["(no tweet text received)"] });
     }
 
-   const moods = [
-  "calmly confident, nothing forced",
-  "friendly and sharp, but supportive",
-  "playfully skeptical, in a good way",
-  "market-wise, slightly amused",
-  "seen this cycle before, no panic",
-  "quietly optimistic with a smile",
-  "light sarcasm, zero stress",
-  "kind, honest, and emotionally aware",
-  "thought-provoking, not dramatic",
-  "understands the market and people",
-  "empathetic but still realistic"
-];
+    const selected = getRandomExamples(examples, 5);
 
-const mood = moods[Math.floor(Math.random() * moods.length)];
+    // 💥 формируем реальные few-shot сообщения
+    const fewShotMessages = [];
 
-const completion = await openai.chat.completions.create({
-  model: "gpt-4o",
-  messages: [
-    {
-      role: "system",
-      content: `
-You are a cheerful crypto enthusiast on Twitter.
-You sound kind, funny, emotionally aware, and easy to like.
+    selected.forEach(example => {
+      fewShotMessages.push({
+        role: "user",
+        content: example.tweet,
+      });
 
-Your goal:
-- support the author
-- react like a real human
-- add warmth and light humor
-- make people smile or nod
-
-Style:
-- very kind
-- playful
-- optimistic
-- slightly nerdy
-- never toxic
-
-Rules:
-- short lines only
-- natural Twitter phrasing
-- unfinished thoughts are OK
-- casual human expressions allowed
-- emojis allowed (max 1)
-- no explanations
-- no hashtags
-
-Mood: ${mood}
-
-Return exactly 3 replies.
-Each reply under 7 words.
-Each reply on a new line.
-      `.trim(),
-    },
-    {
-      role: "user",
-      content: tweetText,
-    },
-  ],
-  temperature: 0.9,
-  max_tokens: 80,
-});
-
-
-    const text = completion.choices?.[0]?.message?.content?.trim();
-
-    res.json({
-      replies: text
-        ? text.split("\n").map(t => t.trim()).filter(Boolean).slice(0, 3)
-        : ["(AI returned empty response)"],
+      fewShotMessages.push({
+        role: "assistant",
+        content: example.reply,
+      });
     });
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      temperature: 0.6, // ниже = ближе к стилю
+      max_tokens: 120,
+      messages: [
+        {
+          role: "system",
+          content: `
+Reply exactly in the same tone, structure, and intensity 
+as the previous assistant messages.
+
+Do not soften the style.
+Do not summarize.
+Do not explain.
+Just respond naturally.
+          `.trim(),
+        },
+        ...fewShotMessages,
+        {
+          role: "user",
+          content: tweetText,
+        },
+      ],
+    });
+
+    const rawText = completion.choices?.[0]?.message?.content?.trim();
+
+    let replies = [];
+
+    if (rawText) {
+      replies = rawText
+        .split("\n")
+        .map(r => r.trim())
+        .filter(Boolean)
+        .slice(0, 3);
+    }
+
+    if (!replies.length) {
+      replies = ["seen this before."];
+    }
+
+    res.json({ replies });
 
   } catch (err) {
     console.error("Generate error:", err);
