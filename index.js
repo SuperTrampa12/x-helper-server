@@ -24,18 +24,13 @@ function getRandomExamples(arr, count = 5) {
 
 function cleanText(text) {
   return text
-    .replace(/[-–—]/g, "") // убираем дефисы и тире
+    .replace(/[-–—]/g, "") // убираем любые тире
     .replace(/\s+/g, " ")
     .trim();
 }
 
-function limitWords(text, min = 2, max = 20) {
-  const words = text.split(" ").filter(Boolean);
-  if (words.length < min) return text;
-  if (words.length > max) {
-    return words.slice(0, max).join(" ");
-  }
-  return text;
+function wordCount(text) {
+  return text.split(" ").filter(Boolean).length;
 }
 
 async function generateOne(tweetText) {
@@ -54,25 +49,39 @@ async function generateOne(tweetText) {
     });
   });
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o",
-    temperature: 0.8 + Math.random() * 0.5, // вариативность
-    max_tokens: 120,
-    messages: [
-      ...fewShotMessages,
-      {
-        role: "user",
-        content: tweetText,
-      },
-    ],
-  });
+  // до 3 попыток попасть в диапазон слов
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      temperature: 1.15,
+      presence_penalty: 0.8,
+      frequency_penalty: 0.6,
+      max_tokens: 80,
+      messages: [
+        ...fewShotMessages,
+        {
+          role: "system",
+          content:
+            "Reply in 2 to 20 words. No dashes. Natural, sharp, sarcastic, provocative if relevant. No explanations.",
+        },
+        {
+          role: "user",
+          content: tweetText,
+        },
+      ],
+    });
 
-  let text = completion.choices?.[0]?.message?.content?.trim() || "";
+    let text = completion.choices?.[0]?.message?.content?.trim() || "";
+    text = cleanText(text);
 
-  text = cleanText(text);
-  text = limitWords(text, 2, 20);
+    const count = wordCount(text);
 
-  return text;
+    if (count >= 2 && count <= 20) {
+      return text;
+    }
+  }
+
+  return "interesting timing.";
 }
 
 app.get("/", (req, res) => {
@@ -91,7 +100,7 @@ app.post("/generate", async (req, res) => {
 
     for (let i = 0; i < 3; i++) {
       const reply = await generateOne(tweetText);
-      if (reply) replies.push(reply);
+      replies.push(reply);
     }
 
     res.json({ replies });
