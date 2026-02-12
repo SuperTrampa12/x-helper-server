@@ -30,6 +30,7 @@ function cleanText(text) {
 }
 
 async function generateOne(tweetText) {
+
   const moods = [
     "calmly confident, nothing forced",
     "friendly and sharp, but supportive",
@@ -62,9 +63,9 @@ async function generateOne(tweetText) {
 
   const completion = await openai.chat.completions.create({
     model: "gpt-4o",
-    temperature: 1.1,
-    presence_penalty: 0.7,
-    frequency_penalty: 0.6,
+    temperature: 1.25,               // немного выше
+    presence_penalty: 0.9,           // сильнее толкает к новизне
+    frequency_penalty: 0.7,
     max_tokens: 60,
     messages: [
       {
@@ -90,7 +91,8 @@ Style:
 Rules:
 - short lines only
 - natural Twitter phrasing
-- unfinished thoughts are OK
+- always finish the sentence naturally
+- never end mid-thought
 - casual human expressions allowed
 - emojis allowed max 1
 - no explanations
@@ -113,7 +115,6 @@ Reply in under 7 words.
 
   text = cleanText(text);
 
-  // ограничиваем до 7 слов без обрезания смысла
   const words = text.split(" ").filter(Boolean);
   if (words.length > 7) {
     text = words.slice(0, 7).join(" ");
@@ -130,6 +131,8 @@ app.post("/generate", async (req, res) => {
   try {
     const { tweetText } = req.body;
 
+    console.log("Incoming tweetText:", tweetText);
+
     if (!tweetText) {
       return res.json({ replies: ["(no tweet text received)"] });
     }
@@ -138,8 +141,12 @@ app.post("/generate", async (req, res) => {
 
     for (let i = 0; i < 3; i++) {
       const reply = await generateOne(tweetText);
+      console.log(`Reply ${i + 1}:`, reply);
       replies.push(reply);
     }
+
+    console.log("Final replies:", replies);
+    console.log("----");
 
     res.json({ replies });
 
@@ -150,6 +157,7 @@ app.post("/generate", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
+
 app.listen(PORT, () => {
   console.log("Server running on port", PORT);
 });
